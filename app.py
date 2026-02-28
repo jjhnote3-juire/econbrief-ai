@@ -15,8 +15,8 @@ st.set_page_config(page_title="EconBrief AI", page_icon="🌤️", layout="wide"
 # ==========================================
 def send_email(ai_text, news_text):
     # 👇 본인 정보로 수정 필수!
-    sender_email = st.secrets["jjhq80416@gmail.com"] 
-    app_password = st.secrets["uwka azzh tcyr ysfc"] 
+    sender_email = st.secrets["SENDER_EMAIL"]
+    app_password = st.secrets["APP_PASSWORD"]
     receiver_email = "jjhnote3@gmail.com" 
 
     msg = MIMEMultipart()
@@ -66,7 +66,7 @@ else:
     st.divider()
 
     # API 설정 (키 입력 필수!)
-    MY_API_KEY = st.secrets["AIzaSyBL7Xm0SNTpE21h--qCLugC-4WmIQfACHk"]
+    MY_API_KEY = st.secrets["API_KEY"]
     genai.configure(api_key=MY_API_KEY, transport="rest")
     model = genai.GenerativeModel('gemini-2.5-flash')
 

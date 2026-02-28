@@ -1,0 +1,30 @@
+name: Eve Morning Briefing
+
+on:
+  schedule:
+    # 한국 시간 아침 7시 = UTC 시간 밤 22시 (매일 22:00 UTC에 실행)
+    - cron: '0 22 * * *'
+  workflow_dispatch: # 내가 버튼을 눌러서 수동으로 테스트할 수 있는 기능
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance google-generativeai gspread oauth2client
+          
+      - name: Run Newsletter Script
+        env: # 위에서 만든 금고(Secrets)의 열쇠를 파이썬에게 건네주는 곳
+          API_KEY: ${{ secrets.API_KEY }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python newsletter.py

@@ -75,43 +75,50 @@ if menu == "👤 가입 / 로그인":
         
         with st.container(border=True):
             login_email = st.text_input("이메일 주소", placeholder="example@gmail.com")
-            # [핵심] 가입 시 메일 수신 여부를 선택하게 만듦!
             want_newsletter = st.checkbox("📬 매일 아침 7시 이브의 모닝 브리핑 이메일로 받기 (무료)", value=True)
             
             if st.button("시작하기", use_container_width=True):
+                # 💡 [핵심 방어막] 허용할 대형 이메일 도메인 리스트
+                allowed_domains = ["gmail.com", "naver.com", "daum.net", "kakao.com", "hanmail.net", "nate.com", "icloud.com"]
+                
                 if "@" in login_email and "." in login_email:
-                    # 1. 로그인 성공 처리
-                    st.session_state.logged_in_user = login_email
+                    # 입력한 이메일에서 @ 뒤의 도메인만 잘라내서 소문자로 변환 (예: NaVer.com -> naver.com)
+                    domain = login_email.split("@")[1].lower()
                     
-                    # 2. 브리핑 수신에 체크했을 경우에만 구글 시트(DB)에 저장
-                    if want_newsletter:
-                        with st.spinner("구독 명단에 소중한 이메일을 등록하는 중입니다... 💌"):
-                            try:
-                                import gspread
-                                from oauth2client.service_account import ServiceAccountCredentials
-                                import datetime
-                                import json
+                    if domain in allowed_domains:
+                        # 1. 로그인 성공 처리
+                        st.session_state.logged_in_user = login_email
+                        
+                        # 2. 브리핑 수신에 체크했을 경우에만 구글 시트(DB)에 저장
+                        if want_newsletter:
+                            with st.spinner("구독 명단에 소중한 이메일을 등록하는 중입니다... 💌"):
+                                try:
+                                    import gspread
+                                    from oauth2client.service_account import ServiceAccountCredentials
+                                    import datetime
+                                    import json
 
-                                scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                                creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"])
-                                creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-                                client = gspread.authorize(creds)
+                                    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+                                    creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"])
+                                    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+                                    client = gspread.authorize(creds)
 
-                                sheet = client.open("EconBrief 구독자").sheet1
-                                now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                # 구글 시트에 이메일과 시간 저장
-                                sheet.append_row([login_email, now])
+                                    sheet = client.open("EconBrief 구독자").sheet1
+                                    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                    sheet.append_row([login_email, now])
 
-                                st.success("🎉 가입 및 브리핑 구독이 완료되었습니다!")
-                                st.balloons()
-                            except Exception as e:
-                                st.error(f"로그인은 되었으나, 구글 시트 저장에 실패했습니다. 관리자에게 문의하세요. ({e})")
+                                    st.success("🎉 가입 및 브리핑 구독이 완료되었습니다!")
+                                    st.balloons()
+                                except Exception as e:
+                                    st.error(f"로그인은 되었으나, 구글 시트 저장에 실패했습니다. 관리자에게 문의하세요. ({e})")
+                        else:
+                            st.success("🎉 성공적으로 로그인되었습니다! (브리핑 메일은 발송되지 않습니다.)")
+                            st.balloons()
                     else:
-                        st.success("🎉 성공적으로 로그인되었습니다! (브리핑 메일은 발송되지 않습니다.)")
-                        st.balloons()
+                        # 도메인이 허용 목록에 없을 때 튕겨내기!
+                        st.error("⚠️ 봇(Bot) 무단 가입 방지를 위해 구글, 네이버, 다음, 카카오 등 주요 포털 이메일로만 가입할 수 있습니다.")
                 else:
-                    st.error("⚠️ 올바른 이메일 주소를 입력해주세요.")
-
+                    st.error("⚠️ 올바른 이메일 형식을 입력해주세요.")
 # ==========================================
 # 📖 가이드 페이지
 # ==========================================
@@ -234,3 +241,4 @@ elif menu == "🏠 홈 (오늘의 브리핑)":
 
         with st.expander("📰 원문 종합 뉴스 보기"):
             st.write(d['news_text'])
+

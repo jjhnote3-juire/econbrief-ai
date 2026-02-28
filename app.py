@@ -15,7 +15,7 @@ import datetime
 st.set_page_config(page_title="EconBrief AI", page_icon="🌤️", layout="wide")
 
 # ==========================================
-# 0. 세션 상태(메모장) 초기화
+# 0. 세션 상태 초기화
 # ==========================================
 if "briefing_data" not in st.session_state:
     st.session_state.briefing_data = None
@@ -54,31 +54,17 @@ def send_email(ai_text, news_text):
         st.error(f"발송 실패: {e}")
         return False
 
-# ==========================================
-# 🕵️‍♂️ [핵심] 비밀 관제실을 여는 마법의 열쇠
-# ==========================================
-# URL 주소 끝에 "?admin=true" 가 붙어있을 때만 True가 됩니다!
+# 비밀 관제실 모드 체크
 is_admin_mode = st.query_params.get("admin") == "true"
 
 # ==========================================
-# 1. 사이드바 메뉴 & 독립된 로그인 창
+# 1. 사이드바 (로그인 우선 배치 -> 메뉴)
 # ==========================================
 with st.sidebar:
-    st.title("📋 메뉴")
+    st.title("🌤️ EconBrief AI")
     
-    # 메뉴 순서 정리 (로그인/가입은 여기서 뺐습니다)
-    menu_options = ["🏠 홈 (오늘의 브리핑)", "📖 이브(Eve)란?", "📜 이용약관 및 면책조항"]
-    
-    # 관리자 모드일 때만 메뉴에 관제실을 몰래 추가합니다!
-    if is_admin_mode:
-        menu_options.append("🛠️ 관리자 관제실 (Admin)")
-        
-    menu = st.radio("이동할 페이지를 선택하세요:", menu_options, label_visibility="collapsed")
-    
-    st.divider()
-    
-    # 👤 독립된 가입 / 로그인 블록 (사이드바에 항상 고정)
-    st.subheader("👤 가입 / 로그인")
+    # 👤 가입 / 로그인을 가장 위로 올림!
+    st.subheader("👤 내 계정")
     if st.session_state.logged_in_user:
         st.success(f"👋 환영합니다!\n**{st.session_state.logged_in_user}** 님")
         if st.button("로그아웃", use_container_width=True):
@@ -88,8 +74,6 @@ with st.sidebar:
         with st.expander("🚀 이메일로 3초 간편 가입", expanded=True):
             login_email = st.text_input("이메일 주소", placeholder="example@gmail.com")
             want_newsletter = st.checkbox("📬 매일 아침 브리핑 구독", value=True)
-            
-            # 🛡️ 안전핀 1: 가입 버튼 바로 위
             st.caption("⚠️ 가입 시 [이용약관 및 면책조항]에 동의한 것으로 간주됩니다.")
             
             if st.button("시작하기", use_container_width=True, type="primary"):
@@ -119,6 +103,16 @@ with st.sidebar:
                         st.error("⚠️ 무단 가입 방지를 위해 주요 포털 이메일만 허용됩니다.")
                 else:
                     st.error("⚠️ 올바른 이메일 형식을 입력해주세요.")
+                    
+    st.divider()
+    
+    # 📋 메뉴는 로그인 아래에 배치
+    st.subheader("📋 메뉴")
+    menu_options = ["🏠 홈 (오늘의 브리핑)", "📖 이브(Eve)란?", "📜 이용약관 및 면책조항"]
+    if is_admin_mode:
+        menu_options.append("🛠️ 관리자 관제실 (Admin)")
+        
+    menu = st.radio("이동할 페이지를 선택하세요:", menu_options, label_visibility="collapsed")
 
 # ==========================================
 # 🏠 홈 화면 
@@ -154,20 +148,20 @@ if menu == "🏠 홈 (오늘의 브리핑)":
                     news_titles.append(title)
                     news_text += f"{len(news_titles)}. {title}\n"
         except Exception:
-            news_text = "현재 서버 통신 문제로 실시간 뉴스를 불러오지 못했습니다."
+            news_text = "현재 서버 통신 문제로 뉴스를 불러오지 못했습니다."
 
         if not news_text.strip():
-            news_text = "오늘 장에 큰 영향을 미칠만한 거시경제 주요 뉴스가 없습니다."
+            news_text = "오늘 장에 큰 영향을 미칠만한 거시경제 뉴스가 없습니다."
 
         prompt = f"""
         너는 사용자의 스마트한 경제 비서이자 전속 아나운서인 '이브(Eve)'야.
         [데이터] 나스닥:{ndx[0]}({ndx[2]}%), 금리:{tnx[0]}%, VIX:{vix[0]}, 환율:{krw[0]}원
         [뉴스] {news_text}
         
-        1. 시작할 때 "안녕하세요! 여러분의 경제 비서 이브입니다." 라고 다정하게 인사할 것.
-        2. 시장 날씨, KOSPI 예상, 대출 금리 영향을 분석할 것.
-        3. [법적 보호 규칙]: 절대 "매수/매도 하세요" 등 단정적인 투자 권유를 하지 말고, "관심이 필요합니다" 등 중립적으로 작성할 것.
-        4. 절대로 마크다운(*, #)을 쓰지 말고, 강조는 HTML <b>, 줄바꿈은 <br> 태그만 사용할 것.
+        1. 시작할 때 "안녕하세요! 여러분의 경제 비서 이브입니다." 라고 다정하게 인사해.
+        2. 시장 날씨, KOSPI 예상, 대출 금리 영향을 분석해.
+        3. [법적 규칙]: 절대 "매수/매도 하세요" 등 단정적인 권유를 하지 말고 중립적으로 작성해.
+        4. 절대로 마크다운(*, #) 쓰지 말고 HTML <b>, <br>만 사용해.
         """
         response = model.generate_content(prompt)
         return ndx, tnx, vix, krw, news_text, response.text
@@ -175,8 +169,7 @@ if menu == "🏠 홈 (오늘의 브리핑)":
     if st.button("🔄 오늘 아침 브리핑 가져오기", key="get_briefing_btn"):
         with st.spinner('이브가 시장 데이터를 분석 중입니다...'):
             ndx, tnx, vix, krw, news_text, ai_text = get_morning_briefing()
-            audio_text = re.sub(r'<[^>]+>', '', ai_text)
-            audio_text = audio_text.replace("☀️", "").replace("☁️", "").replace("☔", "").replace("☕", "").replace("*", "").replace("#", "")
+            audio_text = re.sub(r'<[^>]+>', '', ai_text).replace("☀️", "").replace("☁️", "").replace("☔", "").replace("☕", "")
             with open("script.txt", "w", encoding="utf-8") as f: f.write(audio_text)
             os.system('edge-tts --file script.txt --voice ko-KR-SunHiNeural --rate=+20% --write-media briefing_audio.mp3')
             st.session_state.briefing_data = {"ndx": ndx, "tnx": tnx, "vix": vix, "krw": krw, "news_text": news_text, "ai_text": ai_text}
@@ -193,7 +186,7 @@ if menu == "🏠 홈 (오늘의 브리핑)":
         
         if st.button("📨 이 브리핑을 내 이메일로 보내기", key="send_email_btn"):
             if not st.session_state.logged_in_user:
-                st.warning("로그인 후 이용하시면 입력하신 이메일로 발송됩니다! (현재는 테스트 계정으로 발송됩니다)")
+                st.warning("로그인 후 이용하시면 입력하신 이메일로 발송됩니다!")
             with st.spinner("이브가 브리핑을 전송 중입니다... 💌"):
                 if send_email(d['ai_text'], d['news_text']):
                     st.success("✅ 메일 발송 성공!")
@@ -218,17 +211,35 @@ if menu == "🏠 홈 (오늘의 브리핑)":
         with st.expander("📰 원문 종합 뉴스 보기"):
             st.write(d['news_text'])
             
-        # 🛡️ 안전핀 2: 홈 화면 브리핑 맨 밑바닥
         st.divider()
         st.caption("⚠️ **[면책 조항]** 본 서비스는 투자 참고용이며, 이용 시 사이드바 메뉴의 [이용약관 및 면책조항]에 동의한 것으로 간주됩니다. 투자의 최종 결정과 책임은 본인에게 있습니다.")
 
 # ==========================================
-# 📖 가이드 페이지
+# 📖 이브(Eve) 소개 및 제작 배경
 # ==========================================
 elif menu == "📖 이브(Eve)란?":
-    st.title("📖 EconBrief AI 소개")
-    st.write("초보자를 위한 똑똑한 경제 비서, 이브(Eve)입니다.")
-    st.info("☀️ 맑음: 상승장 | ☁️ 흐림: 혼조세 | ☔ 비: 하락장")
+    st.title("📖 경제 비서, 이브(Eve)를 소개합니다")
+    
+    st.subheader("👋 안녕하세요! 당신의 경제 비서, 이브입니다.")
+    st.write("EconBrief AI는 매일 아침 쏟아지는 복잡한 월스트리트의 경제 뉴스와 지표들을 분석하여, 누구나 이해하기 쉬운 **'경제 날씨'**로 번역해 주는 인공지능 시황 브리핑 서비스입니다.")
+    
+    with st.container(border=True):
+        st.subheader("💡 제작 배경 (Why Eve?)")
+        st.write("""
+        현대 사회에서 환율, 금리, 글로벌 증시의 흐름은 우리의 지갑 사정과 직결됩니다. 하지만 초보 투자자나 바쁜 현대인들이 매일 새벽에 발표되는 미국 연준(Fed)의 성명서나 블룸버그 기사 원문을 직접 찾아보고 해석하는 것은 시간적으로도, 심리적으로도 큰 장벽입니다.
+        
+        **"거시 경제(Macro-economics)의 거대한 흐름을 누구나 클릭 한 번으로, 마치 매일 아침 일기예보를 보듯 쉽게 파악할 수는 없을까?"**
+        
+        이러한 고민에서 출발하여 탄생한 것이 바로 '이브(Eve)'입니다. 이브는 어렵고 차가운 금융 지표와 숫자를 따뜻하고 친절한 언어로 풀어주어, 사용자들의 경제적 시야를 넓혀주고 현명한 의사결정을 돕는 든든한 파트너가 되고자 합니다.
+        """)
+        
+    with st.container(border=True):
+        st.subheader("✨ 이브의 3가지 핵심 능력")
+        st.markdown("""
+        1. **📊 실시간 데이터 스캐닝:** 나스닥, 미국 10년물 국채 금리, VIX(공포지수), 원/달러 환율 등 경제 핵심 지표를 매일 아침 자동으로 추적합니다.
+        2. **🧠 AI 심층 분석:** 단순한 수치 나열을 넘어, 해당 지표의 변화가 '한국 코스피 시장'과 '우리의 대출 금리'에 미칠 실질적인 타격을 인과관계에 맞춰 분석합니다.
+        3. **💌 모닝 레터 & 긴급 속보:** 바쁜 출근길에 가볍게 읽으실 수 있도록 매일 아침 7시 브리핑을 배달하며, 시장에 큰 충격이 발생했을 때는 즉시 긴급 속보를 발송하여 리스크 관리를 돕습니다.
+        """)
 
 # ==========================================
 # 📜 이용약관 및 면책조항 페이지
@@ -245,7 +256,7 @@ elif menu == "📜 이용약관 및 면책조항":
         st.write("서비스 운영자는 본 서비스에서 제공하는 정보의 오류, 지연, 누락, 또는 이를 신뢰하여 내린 투자 결과에 대해 어떠한 직·간접적인 법적 책임도 지지 않습니다.")
 
 # ==========================================
-# 🛠️ 관리자 관제실 (URL에 ?admin=true 가 있을 때만 보임)
+# 🛠️ 관리자 관제실 (Admin)
 # ==========================================
 elif menu == "🛠️ 관리자 관제실 (Admin)":
     st.title("🚨 긴급 속보 관제실 (Admin Only)")

@@ -198,3 +198,4 @@ else:
                         st.error(f"구글 시트 저장 실패: {e}\n(secrets.json 파일 위치와 시트 공유 상태를 확인하세요!)")
             else:
                 st.error("⚠️ 올바른 이메일 주소를 입력해주세요.")
+

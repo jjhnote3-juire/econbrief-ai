@@ -173,7 +173,7 @@ if menu == "🏠 글로벌 대시보드":
             # 오디오 생성 로직 원상복구
             audio_text = re.sub(r'<[^>]+>', '', ai_text).replace("☀️", "").replace("☁️", "").replace("☔", "").replace("☕", "")
             with open("script.txt", "w", encoding="utf-8") as f: f.write(audio_text)
-            os.system('edge-tts --file script.txt --voice ko-KR-SunHiNeural --rate=+0% --write-media briefing_audio.mp3')
+            os.system('edge-tts --file script.txt --voice ko-KR-SunHiNeural --rate=-10% --write-media briefing_audio.mp3')
             
             st.session_state.briefing_data = {"ndx": ndx, "tnx": tnx, "vix": vix, "krw": krw, "news_text": news_text, "ai_text": ai_text}
 
@@ -359,6 +359,7 @@ elif menu == "🛠️ 관리자 관제실 (Admin)":
                                 st.error(f"오류: {e}")
         else:
             st.error("비밀번호가 일치하지 않습니다.")
+
 
 
 

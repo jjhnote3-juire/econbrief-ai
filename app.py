@@ -113,7 +113,7 @@ else:
             audio_text = re.sub(r'<[^>]+>', '', ai_text)
             audio_text = audio_text.replace("☀️", "").replace("☁️", "").replace("☔", "").replace("☕", "").replace("*", "").replace("#", "")
             with open("script.txt", "w", encoding="utf-8") as f: f.write(audio_text)
-            os.system('python -m edge_tts --file script.txt --voice ko-KR-SunHiNeural --rate=+20% --write-media briefing_audio.mp3')
+            os.system('edge-tts --file script.txt --voice ko-KR-SunHiNeural --rate=+20% --write-media briefing_audio.mp3')
             
             # 메모장에 저장
             st.session_state.briefing_data = {
@@ -198,4 +198,5 @@ else:
                         st.error(f"구글 시트 저장 실패: {e}\n(secrets.json 파일 위치와 시트 공유 상태를 확인하세요!)")
             else:
                 st.error("⚠️ 올바른 이메일 주소를 입력해주세요.")
+
 

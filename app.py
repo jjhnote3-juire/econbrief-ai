@@ -11,6 +11,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import json
 import datetime
+import requests  # 👈 텔레그램 통신을 위해 새로 추가된 도구!
 
 st.set_page_config(page_title="EconBrief AI", page_icon="🌤️", layout="wide")
 
@@ -23,7 +24,7 @@ if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = None
 
 # ==========================================
-# 📧 1:1 이메일 발송 함수
+# 📧 이메일 & 텔레그램 발송 함수
 # ==========================================
 def send_email(ai_text, news_text):
     sender_email = st.secrets["SENDER_EMAIL"]
@@ -51,10 +52,24 @@ def send_email(ai_text, news_text):
             server.send_message(msg)
         return True
     except Exception as e:
-        st.error(f"발송 실패: {e}")
+        st.error(f"메일 발송 실패: {e}")
         return False
 
-# 비밀 관제실 모드 체크
+# 📱 텔레그램 발송 전용 함수
+def send_telegram_message(text):
+    try:
+        token = st.secrets["TELEGRAM_BOT_TOKEN"]
+        chat_id = st.secrets["TELEGRAM_CHAT_ID"]
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        
+        # HTML 태그를 텔레그램용 마크다운이나 일반 텍스트로 조금 다듬어줍니다
+        clean_text = text.replace("<br>", "\n").replace("<b>", "🔥 ").replace("</b>", " 🔥")
+        
+        payload = {"chat_id": chat_id, "text": clean_text, "parse_mode": "HTML"}
+        requests.post(url, data=payload)
+    except Exception as e:
+        print(f"텔레그램 발송 실패: {e}")
+
 is_admin_mode = st.query_params.get("admin") == "true"
 
 # ==========================================
@@ -63,7 +78,6 @@ is_admin_mode = st.query_params.get("admin") == "true"
 with st.sidebar:
     st.title("🌤️ EconBrief AI")
     
-    # 👤 가입 / 로그인을 가장 위로 올림!
     st.subheader("👤 내 계정")
     if st.session_state.logged_in_user:
         st.success(f"👋 환영합니다!\n**{st.session_state.logged_in_user}** 님")
@@ -106,7 +120,6 @@ with st.sidebar:
                     
     st.divider()
     
-    # 📋 메뉴는 로그인 아래에 배치
     st.subheader("📋 메뉴")
     menu_options = ["🏠 홈 (오늘의 브리핑)", "📖 이브(Eve)란?", "📜 이용약관 및 면책조항"]
     if is_admin_mode:
@@ -219,10 +232,8 @@ if menu == "🏠 홈 (오늘의 브리핑)":
 # ==========================================
 elif menu == "📖 이브(Eve)란?":
     st.title("📖 경제 비서, 이브(Eve)를 소개합니다")
-    
     st.subheader("👋 안녕하세요! 당신의 경제 비서, 이브입니다.")
     st.write("EconBrief AI는 매일 아침 쏟아지는 복잡한 월스트리트의 경제 뉴스와 지표들을 분석하여, 누구나 이해하기 쉬운 **'경제 날씨'**로 번역해 주는 인공지능 시황 브리핑 서비스입니다.")
-    
     with st.container(border=True):
         st.subheader("💡 제작 배경 (Why Eve?)")
         st.write("""
@@ -232,7 +243,6 @@ elif menu == "📖 이브(Eve)란?":
         
         이러한 고민에서 출발하여 탄생한 것이 바로 '이브(Eve)'입니다. 이브는 어렵고 차가운 금융 지표와 숫자를 따뜻하고 친절한 언어로 풀어주어, 사용자들의 경제적 시야를 넓혀주고 현명한 의사결정을 돕는 든든한 파트너가 되고자 합니다.
         """)
-        
     with st.container(border=True):
         st.subheader("✨ 이브의 3가지 핵심 능력")
         st.markdown("""
@@ -260,7 +270,7 @@ elif menu == "📜 이용약관 및 면책조항":
 # ==========================================
 elif menu == "🛠️ 관리자 관제실 (Admin)":
     st.title("🚨 긴급 속보 관제실 (Admin Only)")
-    st.write("구독자 전체에게 실시간 긴급 속보를 발송하는 곳입니다.")
+    st.write("구독자 전체에게 이메일을 쏘고, 대표님의 텔레그램으로도 속보를 즉시 발송합니다.")
     
     admin_pw = st.text_input("🔑 관리자 비밀번호를 입력하세요", type="password")
     if admin_pw:
@@ -268,11 +278,11 @@ elif menu == "🛠️ 관리자 관제실 (Admin)":
             st.success("✅ 최고 관리자 인증 완료.")
             with st.container(border=True):
                 issue_text = st.text_input("현재 발생한 긴급 이슈", placeholder="예: 연준 긴급 금리 인하 발표")
-                if st.button("🚨 전 구독자에게 긴급 속보 발송하기", type="primary", use_container_width=True):
+                if st.button("🚨 전 구독자 이메일 & 텔레그램 속보 동시 발송!", type="primary", use_container_width=True):
                     if not issue_text:
                         st.warning("긴급 이슈를 입력해주세요!")
                     else:
-                        with st.spinner("발송 준비 중..."):
+                        with st.spinner("발송 준비 중... (이메일 및 텔레그램)"):
                             try:
                                 MY_API_KEY = st.secrets["API_KEY"]
                                 genai.configure(api_key=MY_API_KEY, transport="rest")
@@ -294,6 +304,11 @@ elif menu == "🛠️ 관리자 관제실 (Admin)":
                                 """
                                 ai_text = model.generate_content(prompt).text
                                 
+                                # 📱 텔레그램 발송 함수 호출!
+                                telegram_msg = f"🚨 [긴급 속보 발생]\n\n이슈: {issue_text}\n\n{ai_text}"
+                                send_telegram_message(telegram_msg)
+                                
+                                # 📧 이메일 발송 처리
                                 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
                                 creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"], strict=False)
                                 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -319,7 +334,7 @@ elif menu == "🛠️ 관리자 관제실 (Admin)":
                                             server.send_message(msg)
                                             success_cnt += 1
                                         except: pass
-                                st.success(f"🎉 총 {success_cnt}명에게 발송 완료!")
+                                st.success(f"🎉 총 {success_cnt}명 이메일 발송 완료 및 텔레그램 속보 전송 완료!")
                             except Exception as e:
                                 st.error(f"오류: {e}")
         else:

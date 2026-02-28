@@ -116,7 +116,7 @@ if menu == "🛠️ 관리자 관제실":
                                 
                                 # 3. 구글 시트에서 전체 구독자 불러오기
                                 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                                creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"])
+                                creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"], strict=False)
                                 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
                                 client = gspread.authorize(creds)
                                 sheet = client.open("EconBrief 구독자").sheet1
@@ -294,3 +294,4 @@ elif menu == "🏠 홈 (오늘의 브리핑)":
 
         with st.expander("📰 원문 종합 뉴스 보기"):
             st.write(d['news_text'])
+

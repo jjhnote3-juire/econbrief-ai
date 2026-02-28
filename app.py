@@ -77,18 +77,16 @@ else:
         pct = round((change / previous) * 100, 2)
         return current, change, pct
 
-    @st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
     def get_morning_briefing():
         ndx = get_data_and_change("^IXIC")
         tnx = get_data_and_change("^TNX")
         vix = get_data_and_change("^VIX")
         krw = get_data_and_change("KRW=X")
 
-        # (기존 뉴스 수집 코드인 spy_news = yf.Ticker("SPY").news[:3] 등등을 지우고 아래로 교체)
         news_titles, news_text = [], ""
         try:
             spy_ticker = yf.Ticker("SPY")
-            # 클라우드 차단 우회를 위한 아주 가벼운 호출
             all_news = spy_ticker.get_news()[:5] 
             for news in all_news:
                 title = news.get('title', '')
@@ -98,11 +96,10 @@ else:
         except Exception:
             news_text = "현재 클라우드 서버 통신 문제로 실시간 뉴스를 불러오지 못했습니다."
 
-        # 만약 뉴스가 텅 비었다면 안내문구 추가
         if not news_text.strip():
             news_text = "오늘 장에 큰 영향을 미칠만한 특별한 거시경제 주요 뉴스가 없습니다."
 
-       prompt = f"""
+        prompt = f"""
         너는 사용자의 스마트한 경제 비서이자 전속 아나운서인 '이브(Eve)'야.
         
         [데이터] 나스닥:{ndx[0]}({ndx[2]}%), 금리:{tnx[0]}%, VIX:{vix[0]}, 환율:{krw[0]}원
@@ -212,6 +209,7 @@ else:
                         st.error(f"구글 시트 저장 실패: {e}\n(secrets.json 파일 위치와 시트 공유 상태를 확인하세요!)")
             else:
                 st.error("⚠️ 올바른 이메일 주소를 입력해주세요.")
+
 
 
 

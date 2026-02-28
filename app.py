@@ -23,7 +23,7 @@ if "logged_in_user" not in st.session_state:
     st.session_state.logged_in_user = None
 
 # ==========================================
-# 📧 1:1 이메일 발송 함수 (일반 사용자용)
+# 📧 1:1 이메일 발송 함수
 # ==========================================
 def send_email(ai_text, news_text):
     sender_email = st.secrets["SENDER_EMAIL"]
@@ -35,7 +35,14 @@ def send_email(ai_text, news_text):
     msg['From'] = sender_email
     msg['To'] = receiver_email
 
-    html_content = f"<html><body><h2>📈 시황 분석</h2><p>{ai_text}</p><hr><h2>📰 뉴스</h2><p>{news_text.replace(chr(10), '<br>')}</p></body></html>"
+    html_content = f"""
+    <html><body>
+    <h2>📈 시황 분석</h2><p>{ai_text}</p><hr><h2>📰 뉴스</h2><p>{news_text.replace(chr(10), '<br>')}</p>
+    <hr>
+    <p style='color:gray; font-size:12px;'><i>여러분의 경제 비서 이브(Eve)가 발송한 메일입니다.</i></p>
+    <p style='color:#a0a0a0; font-size:10px; line-height:1.4;'><b>[면책 조항]</b> 본 메일의 내용은 투자 참고용이며, 법적 책임 소재의 증빙 자료로 사용될 수 없습니다. 투자의 최종 결정과 책임은 투자자 본인에게 있습니다.</p>
+    </body></html>
+    """
     msg.attach(MIMEText(html_content, 'html'))
 
     try:
@@ -48,177 +55,75 @@ def send_email(ai_text, news_text):
         return False
 
 # ==========================================
-# 1. 사이드바 메뉴 
+# 🕵️‍♂️ [핵심] 비밀 관제실을 여는 마법의 열쇠
+# ==========================================
+# URL 주소 끝에 "?admin=true" 가 붙어있을 때만 True가 됩니다!
+is_admin_mode = st.query_params.get("admin") == "true"
+
+# ==========================================
+# 1. 사이드바 메뉴 & 독립된 로그인 창
 # ==========================================
 with st.sidebar:
     st.title("📋 메뉴")
-    # [신규] 관리자 관제실 메뉴 추가!
-    menu = st.radio("이동할 페이지를 선택하세요:", ["🏠 홈 (오늘의 브리핑)", "📖 이브(Eve)란?", "👤 가입 / 로그인", "🛠️ 관리자 관제실", "📜 이용약관 및 면책조항"], key="menu_radio")
+    
+    # 메뉴 순서 정리 (로그인/가입은 여기서 뺐습니다)
+    menu_options = ["🏠 홈 (오늘의 브리핑)", "📖 이브(Eve)란?", "📜 이용약관 및 면책조항"]
+    
+    # 관리자 모드일 때만 메뉴에 관제실을 몰래 추가합니다!
+    if is_admin_mode:
+        menu_options.append("🛠️ 관리자 관제실 (Admin)")
+        
+    menu = st.radio("이동할 페이지를 선택하세요:", menu_options, label_visibility="collapsed")
     
     st.divider()
+    
+    # 👤 독립된 가입 / 로그인 블록 (사이드바에 항상 고정)
+    st.subheader("👤 가입 / 로그인")
     if st.session_state.logged_in_user:
         st.success(f"👋 환영합니다!\n**{st.session_state.logged_in_user}** 님")
-        if st.button("로그아웃"):
+        if st.button("로그아웃", use_container_width=True):
             st.session_state.logged_in_user = None
             st.rerun()
     else:
-        st.info("로그인하고 이브의 모닝 브리핑을 구독해 보세요!")
-
-# ==========================================
-# 🛠️ [신규] 관리자 전용 긴급 속보 관제실
-# ==========================================
-if menu == "🛠️ 관리자 관제실":
-    st.title("🚨 긴급 속보 관제실 (Admin Only)")
-    st.write("구독자 전체에게 실시간 긴급 속보를 발송하는 곳입니다.")
-    
-    # 🔒 관리자 비밀번호 확인
-    admin_pw = st.text_input("🔑 관리자 비밀번호를 입력하세요", type="password")
-    
-    if admin_pw:
-        if admin_pw == st.secrets["ADMIN_PASSWORD"]:
-            st.success("✅ 최고 관리자 인증 완료. 발송 시스템이 활성화되었습니다.")
-            
-            with st.container(border=True):
-                st.subheader("📢 긴급 속보 작성")
-                issue_text = st.text_input("현재 발생한 긴급 이슈 (예: 러시아-우크라이나 확전, 연준 0.5% 긴급 금리 인하 등)", placeholder="여기에 핵심 이슈를 짧게 적어주세요.")
-                
-                if st.button("🚨 전 구독자에게 긴급 속보 발송하기", type="primary", use_container_width=True):
-                    if not issue_text:
-                        st.warning("긴급 이슈를 먼저 입력해주세요!")
-                    else:
-                        with st.spinner("이브가 실시간 데이터를 수집하고 구독자 명단을 불러오는 중입니다..."):
-                            try:
-                                # 1. 실시간 데이터 수집
-                                MY_API_KEY = st.secrets["API_KEY"]
-                                genai.configure(api_key=MY_API_KEY, transport="rest")
-                                model = genai.GenerativeModel('gemini-2.5-flash')
-                                
-                                def get_data(ticker):
-                                    hist = yf.Ticker(ticker).history(period="5d")
-                                    curr = round(hist['Close'].iloc[-1], 2)
-                                    prev = round(hist['Close'].iloc[-2], 2)
-                                    return curr, round(curr - prev, 2), round(((curr - prev) / prev) * 100, 2)
-                                
-                                ndx, tnx, vix, krw = get_data("^IXIC"), get_data("^TNX"), get_data("^VIX"), get_data("KRW=X")
-                                
-                                # 2. AI 긴급 속보 대본 작성
-                                prompt = f"""
-                                너는 경제 비서 '이브(Eve)'야. 방금 아주 긴급한 이슈가 터졌어!
-                                [긴급 이슈]: {issue_text}
-                                [현재 실시간 데이터] 나스닥:{ndx[0]}({ndx[2]}%), 금리:{tnx[0]}%, VIX:{vix[0]}, 환율:{krw[0]}원
-                                
-                                1. "🚨 [긴급 속보] 안녕하세요, 이브입니다." 로 시작할 것.
-                                2. 입력된 [긴급 이슈]가 현재 금융 시장(나스닥, 환율 등)에 미치고 있는 즉각적인 충격을 분석할 것.
-                                3. 구독자들이 지금 당장 취해야 할 리스크 관리 방향을 제시할 것.
-                                4. 절대로 마크다운(*, #)을 쓰지 말고, 강조는 HTML <b>, 줄바꿈은 <br> 태그만 사용할 것.
-                                """
-                                ai_text = model.generate_content(prompt).text
-                                
-                                # 3. 구글 시트에서 전체 구독자 불러오기
-                                scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                                creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"], strict=False)
-                                creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-                                client = gspread.authorize(creds)
-                                sheet = client.open("EconBrief 구독자").sheet1
-                                emails_data = sheet.col_values(1)
-                                subscribers = [e for e in emails_data[1:] if "@" in e]
-                                subscribers = list(set(subscribers)) # 중복 제거
-                                
-                                # 4. 전체 대량 메일 발송
-                                sender_email = st.secrets["SENDER_EMAIL"]
-                                app_password = st.secrets["APP_PASSWORD"]
-                                
-                                with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                                    server.login(sender_email, app_password)
-                                    success_cnt = 0
-                                    for receiver in subscribers:
-                                        msg = MIMEMultipart()
-                                        msg['Subject'] = f'🚨 [긴급 속보] {issue_text} - 이브(Eve) 실시간 브리핑'
-                                        msg['From'] = sender_email
-                                        msg['To'] = receiver
-                                        html_content = f"<html><body style='font-family: Arial;'>{ai_text}<hr><p style='color:gray; font-size:12px;'><i>이브(Eve) 관제실에서 실시간으로 발송된 긴급 속보입니다.</i></p></body></html>"
-                                        msg.attach(MIMEText(html_content, 'html'))
-                                        try:
-                                            server.send_message(msg)
-                                            success_cnt += 1
-                                        except: pass
-                                
-                                st.success(f"🎉 긴급 속보 발송 완료! 총 {success_cnt}명의 구독자에게 성공적으로 전달되었습니다.")
-                                st.balloons()
-                            except Exception as e:
-                                st.error(f"오류 발생: {e}")
-        else:
-            st.error("비밀번호가 일치하지 않습니다.")
-
-# ==========================================
-# 👤 가입 / 로그인 페이지 
-# ==========================================
-elif menu == "👤 가입 / 로그인":
-    st.title("👤 이브(Eve)와 함께하기")
-    if st.session_state.logged_in_user:
-        st.write("이미 로그인되어 있습니다. 홈 화면에서 오늘의 브리핑을 확인해 보세요!")
-    else:
-        st.write("비밀번호 없이 **이메일만으로** 간편하게 가입하고 로그인하세요.")
-        with st.container(border=True):
+        with st.expander("🚀 이메일로 3초 간편 가입", expanded=True):
             login_email = st.text_input("이메일 주소", placeholder="example@gmail.com")
-            want_newsletter = st.checkbox("📬 매일 아침 7시 이브의 모닝 브리핑 이메일로 받기 (무료)", value=True)
-            if st.button("시작하기", use_container_width=True):
+            want_newsletter = st.checkbox("📬 매일 아침 브리핑 구독", value=True)
+            
+            # 🛡️ 안전핀 1: 가입 버튼 바로 위
+            st.caption("⚠️ 가입 시 [이용약관 및 면책조항]에 동의한 것으로 간주됩니다.")
+            
+            if st.button("시작하기", use_container_width=True, type="primary"):
                 allowed_domains = ["gmail.com", "naver.com", "daum.net", "kakao.com", "hanmail.net", "nate.com", "icloud.com"]
                 if "@" in login_email and "." in login_email:
                     domain = login_email.split("@")[1].lower()
                     if domain in allowed_domains:
                         st.session_state.logged_in_user = login_email
                         if want_newsletter:
-                            with st.spinner("구독 명단에 소중한 이메일을 등록하는 중입니다... 💌"):
+                            with st.spinner("명단 등록 중... 💌"):
                                 try:
                                     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                                    creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"])
+                                    creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"], strict=False)
                                     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
                                     client = gspread.authorize(creds)
                                     sheet = client.open("EconBrief 구독자").sheet1
                                     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                     sheet.append_row([login_email, now])
-                                    st.success("🎉 가입 및 브리핑 구독이 완료되었습니다!")
+                                    st.success("🎉 가입 완료!")
                                     st.balloons()
                                 except Exception as e:
-                                    st.error(f"구글 시트 저장 실패: {e}")
+                                    st.error(f"가입 실패: {e}")
                         else:
-                            st.success("🎉 성공적으로 로그인되었습니다!")
+                            st.success("🎉 로그인 성공!")
                             st.balloons()
                     else:
-                        st.error("⚠️ 무단 가입 방지를 위해 주요 포털 이메일로만 가입할 수 있습니다.")
+                        st.error("⚠️ 무단 가입 방지를 위해 주요 포털 이메일만 허용됩니다.")
                 else:
                     st.error("⚠️ 올바른 이메일 형식을 입력해주세요.")
 
 # ==========================================
-# 📖 가이드 페이지
-# ==========================================
-elif menu == "📖 이브(Eve)란?":
-    st.title("📖 EconBrief AI 소개")
-    st.write("초보자를 위한 똑똑한 경제 비서, 이브(Eve)입니다.")
-    st.info("☀️ 맑음: 상승장 | ☁️ 흐림: 혼조세 | ☔ 비: 하락장")
-# ==========================================
-# 📜 이용약관 및 면책조항 페이지
-# ==========================================
-elif menu == "📜 이용약관 및 면책조항":
-    st.title("📜 법적 면책조항 (Disclaimer)")
-    st.write("EconBrief AI 서비스를 이용하시기 전에 반드시 아래 내용을 확인해 주시기 바랍니다.")
-    
-    with st.container(border=True):
-        st.subheader("제1조 (정보의 목적 및 성격)")
-        st.write("본 서비스(EconBrief AI) 및 AI 비서 '이브(Eve)'가 제공하는 모든 거시경제 분석, 뉴스 요약, 시황 전망 등은 사용자에게 경제 흐름에 대한 전반적인 이해를 돕기 위한 **단순 정보 제공 및 참고용(Informational Purpose)**입니다.")
-        
-        st.subheader("제2조 (투자 책임의 원칙)")
-        st.write("본 서비스에서 제공되는 어떠한 정보도 특정 주식, 펀드, 파생상품 등 금융 자산에 대한 매수·매도 추천이나 직접적인 투자 권유(투자자문)를 의미하지 않습니다. 거시 경제 지표와 AI의 분석은 시장의 변동성에 따라 실제 결과와 다를 수 있으며, **투자의 최종 결정과 그로 인해 발생하는 모든 수익 및 손실에 대한 책임은 전적으로 투자자 본인**에게 있습니다.")
-        
-        st.subheader("제3조 (법적 책임의 면제)")
-        st.write("서비스 운영자는 본 서비스에서 제공하는 정보의 오류, 지연, 누락, 또는 이를 신뢰하여 내린 투자 결과에 대해 어떠한 직·간접적인 민/형사상 법적 책임도 지지 않으며, 본 면책조항은 법적 분쟁 시 운영자를 보호하는 증빙 자료로 사용됩니다.")
-        
-    st.info("💡 동의 안내: EconBrief AI의 브리핑을 열람하거나 이메일 구독을 신청하는 행위는 위 면책조항에 완벽히 동의한 것으로 간주됩니다.")
-# ==========================================
 # 🏠 홈 화면 
 # ==========================================
-elif menu == "🏠 홈 (오늘의 브리핑)":
+if menu == "🏠 홈 (오늘의 브리핑)":
     st.title("🌤️ 이브(Eve)의 모닝 브리핑")
     st.write("경제 데이터와 AI 비서 이브의 통찰을 결합한 브리핑입니다. ☕")
     st.divider()
@@ -252,16 +157,17 @@ elif menu == "🏠 홈 (오늘의 브리핑)":
             news_text = "현재 서버 통신 문제로 실시간 뉴스를 불러오지 못했습니다."
 
         if not news_text.strip():
-            news_text = "오늘 장에 큰 영향을 미칠만한 특별한 거시경제 주요 뉴스가 없습니다."
+            news_text = "오늘 장에 큰 영향을 미칠만한 거시경제 주요 뉴스가 없습니다."
 
         prompt = f"""
         너는 사용자의 스마트한 경제 비서이자 전속 아나운서인 '이브(Eve)'야.
         [데이터] 나스닥:{ndx[0]}({ndx[2]}%), 금리:{tnx[0]}%, VIX:{vix[0]}, 환율:{krw[0]}원
         [뉴스] {news_text}
         
-        1. 시작할 때 반드시 "안녕하세요! 여러분의 경제 비서 이브입니다." 라고 다정하게 인사할 것.
+        1. 시작할 때 "안녕하세요! 여러분의 경제 비서 이브입니다." 라고 다정하게 인사할 것.
         2. 시장 날씨, KOSPI 예상, 대출 금리 영향을 분석할 것.
-        3. 절대로 마크다운(*, #)을 쓰지 말고, 강조는 HTML <b>, 줄바꿈은 <br> 태그만 사용할 것.
+        3. [법적 보호 규칙]: 절대 "매수/매도 하세요" 등 단정적인 투자 권유를 하지 말고, "관심이 필요합니다" 등 중립적으로 작성할 것.
+        4. 절대로 마크다운(*, #)을 쓰지 말고, 강조는 HTML <b>, 줄바꿈은 <br> 태그만 사용할 것.
         """
         response = model.generate_content(prompt)
         return ndx, tnx, vix, krw, news_text, response.text
@@ -311,5 +217,99 @@ elif menu == "🏠 홈 (오늘의 브리핑)":
 
         with st.expander("📰 원문 종합 뉴스 보기"):
             st.write(d['news_text'])
+            
+        # 🛡️ 안전핀 2: 홈 화면 브리핑 맨 밑바닥
+        st.divider()
+        st.caption("⚠️ **[면책 조항]** 본 서비스는 투자 참고용이며, 이용 시 사이드바 메뉴의 [이용약관 및 면책조항]에 동의한 것으로 간주됩니다. 투자의 최종 결정과 책임은 본인에게 있습니다.")
 
+# ==========================================
+# 📖 가이드 페이지
+# ==========================================
+elif menu == "📖 이브(Eve)란?":
+    st.title("📖 EconBrief AI 소개")
+    st.write("초보자를 위한 똑똑한 경제 비서, 이브(Eve)입니다.")
+    st.info("☀️ 맑음: 상승장 | ☁️ 흐림: 혼조세 | ☔ 비: 하락장")
 
+# ==========================================
+# 📜 이용약관 및 면책조항 페이지
+# ==========================================
+elif menu == "📜 이용약관 및 면책조항":
+    st.title("📜 법적 면책조항 (Disclaimer)")
+    st.write("EconBrief AI 서비스를 이용하시기 전에 반드시 아래 내용을 확인해 주시기 바랍니다.")
+    with st.container(border=True):
+        st.subheader("제1조 (정보의 목적 및 성격)")
+        st.write("본 서비스(EconBrief AI) 및 AI 비서 '이브(Eve)'가 제공하는 모든 분석과 전망은 사용자에게 경제 흐름에 대한 전반적인 이해를 돕기 위한 **단순 정보 제공 및 참고용**입니다.")
+        st.subheader("제2조 (투자 책임의 원칙)")
+        st.write("본 서비스에서 제공되는 어떠한 정보도 특정 주식, 펀드, 파생상품 등 금융 자산에 대한 매수·매도 추천이나 직접적인 투자 권유를 의미하지 않습니다. **투자의 최종 결정과 그로 인해 발생하는 모든 수익 및 손실에 대한 책임은 전적으로 투자자 본인**에게 있습니다.")
+        st.subheader("제3조 (법적 책임의 면제)")
+        st.write("서비스 운영자는 본 서비스에서 제공하는 정보의 오류, 지연, 누락, 또는 이를 신뢰하여 내린 투자 결과에 대해 어떠한 직·간접적인 법적 책임도 지지 않습니다.")
+
+# ==========================================
+# 🛠️ 관리자 관제실 (URL에 ?admin=true 가 있을 때만 보임)
+# ==========================================
+elif menu == "🛠️ 관리자 관제실 (Admin)":
+    st.title("🚨 긴급 속보 관제실 (Admin Only)")
+    st.write("구독자 전체에게 실시간 긴급 속보를 발송하는 곳입니다.")
+    
+    admin_pw = st.text_input("🔑 관리자 비밀번호를 입력하세요", type="password")
+    if admin_pw:
+        if admin_pw == st.secrets["ADMIN_PASSWORD"]:
+            st.success("✅ 최고 관리자 인증 완료.")
+            with st.container(border=True):
+                issue_text = st.text_input("현재 발생한 긴급 이슈", placeholder="예: 연준 긴급 금리 인하 발표")
+                if st.button("🚨 전 구독자에게 긴급 속보 발송하기", type="primary", use_container_width=True):
+                    if not issue_text:
+                        st.warning("긴급 이슈를 입력해주세요!")
+                    else:
+                        with st.spinner("발송 준비 중..."):
+                            try:
+                                MY_API_KEY = st.secrets["API_KEY"]
+                                genai.configure(api_key=MY_API_KEY, transport="rest")
+                                model = genai.GenerativeModel('gemini-2.5-flash')
+                                
+                                def get_data(ticker):
+                                    hist = yf.Ticker(ticker).history(period="5d")
+                                    curr = round(hist['Close'].iloc[-1], 2)
+                                    prev = round(hist['Close'].iloc[-2], 2)
+                                    return curr, round(curr - prev, 2), round(((curr - prev) / prev) * 100, 2)
+                                ndx, tnx, vix, krw = get_data("^IXIC"), get_data("^TNX"), get_data("^VIX"), get_data("KRW=X")
+                                
+                                prompt = f"""
+                                너는 경제 비서 '이브'야. [긴급 이슈]: {issue_text}
+                                [현재 데이터] 나스닥:{ndx[0]}, 금리:{tnx[0]}%, VIX:{vix[0]}, 환율:{krw[0]}원
+                                1. "🚨 [긴급 속보] 안녕하세요, 이브입니다." 로 시작해.
+                                2. 이슈가 시장에 미칠 영향을 분석해.
+                                3. 절대 마크다운(*, #) 쓰지 말고 HTML <b>, <br>만 사용해.
+                                """
+                                ai_text = model.generate_content(prompt).text
+                                
+                                scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+                                creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"], strict=False)
+                                creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+                                client = gspread.authorize(creds)
+                                sheet = client.open("EconBrief 구독자").sheet1
+                                emails_data = sheet.col_values(1)
+                                subscribers = list(set([e for e in emails_data[1:] if "@" in e]))
+                                
+                                sender_email = st.secrets["SENDER_EMAIL"]
+                                app_password = st.secrets["APP_PASSWORD"]
+                                
+                                with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                                    server.login(sender_email, app_password)
+                                    success_cnt = 0
+                                    for receiver in subscribers:
+                                        msg = MIMEMultipart()
+                                        msg['Subject'] = f'🚨 [긴급 속보] {issue_text} - 이브(Eve)'
+                                        msg['From'] = sender_email
+                                        msg['To'] = receiver
+                                        html_content = f"<html><body>{ai_text}<hr><p style='color:gray; font-size:12px;'><i>[면책 조항] 본 긴급 속보는 투자 참고용이며 법적 증빙으로 사용될 수 없습니다.</i></p></body></html>"
+                                        msg.attach(MIMEText(html_content, 'html'))
+                                        try:
+                                            server.send_message(msg)
+                                            success_cnt += 1
+                                        except: pass
+                                st.success(f"🎉 총 {success_cnt}명에게 발송 완료!")
+                            except Exception as e:
+                                st.error(f"오류: {e}")
+        else:
+            st.error("비밀번호가 일치하지 않습니다.")
